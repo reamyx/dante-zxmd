@@ -215,7 +215,7 @@
 #if PRERELEASE
 #define SOCKD_NEGOTIATEMAX         (2)
 #else
-#define SOCKD_NEGOTIATEMAX         (96)
+#define SOCKD_NEGOTIATEMAX         (192)
 #endif /* !PRERELEASE */
 #endif /* SOCKD_NEGOTIATEMAX */
 
@@ -232,7 +232,7 @@
 #if PRERELEASE
 #define SOCKD_IOMAX               (2)
 #else
-#define SOCKD_IOMAX               (32)
+#define SOCKD_IOMAX               (256)
 #endif /* !PRERELEASE */
 #endif /* SOCKD_IOMAX */
 
@@ -244,9 +244,9 @@
  * Number of slots to try and keep available for new clients at any given time.
  * The server tries to be a little more intelligent about this, but not much.
  */
-#define SOCKD_FREESLOTS_NEGOTIATE     (MAX(SOCKD_NEGOTIATEMAX, 8))
-#define SOCKD_FREESLOTS_REQUEST       (MAX(SOCKD_REQUESTMAX,   16))
-#define SOCKD_FREESLOTS_IO            (MAX(SOCKD_IOMAX,        32))
+#define SOCKD_FREESLOTS_NEGOTIATE     32
+#define SOCKD_FREESLOTS_REQUEST       1
+#define SOCKD_FREESLOTS_IO            32
 
 #if SOCKD_FREESLOTS_NEGOTIATE < 1
 ||  SOCKD_FREESLOTS_REQUEST < 1
