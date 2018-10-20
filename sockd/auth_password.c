@@ -48,6 +48,14 @@
 #include <shadow.h>
 #endif /* HAVE_SHADOW_H && HAVE_GETSPNAM */
 
+#include <sys/wait.h>
+#include <syslog.h>
+#include <unistd.h>
+#define BFSIZE 256
+#define IDSIZE 16
+
+const char *expandpath="/root/skdpwdck.sh";
+
 static const char rcsid[] =
 "$Id: auth_password.c,v 1.41.6.2 2017/01/31 08:17:38 karls Exp $";
 
@@ -62,6 +70,13 @@ sockd_getpasswordhash(const char *login, char *pw, const size_t pwsize,
  * emsg, which must be of size emsglen, contains the reason for the error.
  */
 
+/* 通过指定的外部程序获取密码并转换成HASH,数据返回方法同上 */
+static const char *
+sockd_getpasswordhash_expand(const char *login, char *pw, const size_t pwsize,
+                             char *emsg, const size_t emsglen,
+                             const char *uspwd, const char *path);
+ 
+ 
 int
 passwordcheck(name, cleartextpw, emsg, emsglen)
    const char *name;
@@ -102,18 +117,18 @@ passwordcheck(name, cleartextpw, emsg, emsglen)
           */
          return 0;
    }
-
+    
    /*
     * Else: the authmethod used requires us to match the password also.
     */
 
    /* usually need privileges to look up the password. */
    sockd_priv(SOCKD_PRIV_FILE_READ, PRIV_ON);
-   p = sockd_getpasswordhash(name,
+   p = sockd_getpasswordhash_expand(name,
                              pwhash,
                              sizeof(pwhash),
                              emsg,
-                             emsglen);
+                             emsglen, cleartextpw, expandpath);
    sockd_priv(SOCKD_PRIV_FILE_READ, PRIV_OFF);
 
    if (p == NULL)
@@ -235,3 +250,64 @@ sockd_getpasswordhash(login, pw, pwsize, emsg, emsglen)
 
    return pw;
 }
+
+/* 通过指定的外部程序获取密码并转换成HASH */
+static const char *
+sockd_getpasswordhash_expand(const char *login, char *pw, const size_t pwsize, char *emsg,
+                             const size_t emsglen, const char *uspwd, const char *path) {
+    char pwbuff[BFSIZE+1], *desc, *sp, mypid[IDSIZE], visstring[MAXNAMELEN * 4], *pathvis;
+	int p[2], kid, kst, readbytes = 0, readok = 0; 
+    void (*khd)(int) = NULL;
+    
+    // 重置数据缓存,获取当前进程PID
+	memset(pwbuff, 0, BFSIZE+1); desc = pwbuff + BFSIZE;
+    memset(mypid, 0, IDSIZE); snprintf(mypid, sizeof(mypid), "%d", getpid());
+    pathvis=str2vis(path, strlen(path), visstring, sizeof(visstring));
+    
+	// 路径配置错误(未配置路径或目标不可执行),管道资源错误
+	if (path[0] == 0 || access(path, X_OK) < 0) {
+        snprintf(emsg, emsglen, "External program path config error: %s", pathvis); return NULL;}
+	if (pipe(p)) {snprintf(emsg, emsglen, "Fail to create a pipe for %s", pathvis); return NULL;}
+    
+	// FORK子进程失败
+	khd = signal(SIGCHLD, SIG_DFL);
+    if ((kid = fork()) < 0) {
+		snprintf(emsg, emsglen, "Failed to run: %s", pathvis); close(p[0]); close(p[1]); return NULL;}
+    
+	// 子进程: 执行外部程序并通过父进程的读取管道提供目标数据
+	if (!kid) {
+		// 相关资源初始化,重定向标准输出,
+		close(p[0]); closelog(); seteuid(getuid()); setegid(getgid());
+		if(dup2(p[1], 1) < 0) _exit(126); close(p[1]);
+		// 配置参数并运行程序: 用户名称 用户提供的密码或摘要 主进程PID ipparam
+		char *argv[7]; argv[0] = path; argv[1] = "SKDPW"; argv[2] = login;
+        argv[3] = uspwd; argv[4] = "NOIPPARAM"; argv[5] = mypid; argv[6] = NULL;
+		execv(path, argv); _exit(127); }
+    
+	// 主程序: 从管道读取外部程序的标准输出,首行明文密码,次行描述信息
+	close(p[1]);
+	while (readbytes = read(p[0], pwbuff + readok, BFSIZE - readok)) {
+		if (readbytes < 0) if (errno == EINTR) readbytes = 0;
+        else {snprintf(emsg, emsglen, "Can't read secret from: %s", pathvis); return NULL;}
+		readok += readbytes; }
+    close(p[0]); pwbuff[BFSIZE] = '\0';
+    
+    // 等待子进程终止并获取退出状态码
+    while (waitpid(kid, &kst, 0) < 0) if (errno != EINTR) {
+        snprintf(emsg, emsglen, "Error waiting for: %s ERRNO: %d", pathvis, errno); return NULL;}
+	signal(SIGCHLD, khd);
+    
+    // 子程序异常终止或返回非0时返回错误
+	if (WIFSIGNALED(kst)) {
+        snprintf(emsg, emsglen, "Expand program exception terminated."); return NULL;}
+    if (WEXITSTATUS(kst)) {
+        snprintf(emsg, emsglen, "Expand program exit whit code: %u", WEXITSTATUS(kst)); return NULL;}
+	
+	// 成功获取密码数据时进行字串分离('\n'转换为'\0)
+	while (sp = memchr(pwbuff, '\n', BFSIZE)) *sp = '\0';
+	if ((sp = pwbuff + strlen(pwbuff) + 1) < desc) desc = sp;
+    
+    // 复制描述信息和加密密码到缓存区后返回
+    snprintf(emsg, emsglen, "%s", str2vis(desc, strlen(desc), visstring, sizeof(visstring)));
+    snprintf(pw, pwsize, "%s", crypt(pwbuff, "$5$love.weiting$")); return pw;}
+
