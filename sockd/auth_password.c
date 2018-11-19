@@ -41,7 +41,6 @@
  * the rights to redistribute these changes.
  *
  */
-
 #include "common.h"
 
 #if HAVE_SHADOW_H && HAVE_GETSPNAM
@@ -192,11 +191,11 @@ sockd_getpassword(const char *login, char *pw, const size_t pwsize, char *emsg,
         str_tm_sncp(j_uspwd, sizeof(j_uspwd), uspwd, '\"');
         snprintf(parm, sizeof(parm),
             "{ %s, %s, %s%s%s, %s%s%s, %s%u%s, %s%s%s }",
-            "\"method\": \"SKDPW\"", "\"srvname\": \"SOCKD\""
-            "\"usercnm\": \"",   j_login,      "\"",
-            "\"usercpw\": \"",   j_uspwd,   "\"",
-            "\"srvpid\": \"",    pid,         "\"",
-            "\"asessid\": \"",   asessid,     "\"");
+            "\"method\": \"SKDPW\"", "\"srvname\": \"SOCKD\"",
+            "\"usercnm\": \"", j_login, "\"",
+            "\"usercpw\": \"", j_uspwd, "\"",
+            "\"srvpid\": \"",  pid,     "\"",
+            "\"asessid\": \"", asessid, "\"");
         argv[0] = path; argv[1] = parm; argv[2] = NULL;
         execv(path, argv); _exit(127); }
     
