@@ -67,9 +67,12 @@ static const char rcsid[] =
 
 /* 通过指定的外部程序获取密码返回,同时传递用户提供的密码用于外部验证*/
 static const char *
-sockd_getpassword(const char *login, char *pw, const size_t pwsize,
-                             char *emsg, const size_t emsglen,
-                             const char *uspwd, const char *path);
+sockd_getpassword(const char *, char *, const size_t,
+                             char *, const size_t,
+                             const char *, const char *);
+static int str_get_uuid(char *, size_t);
+static int str_tm_sncp(char *, size_t, char *, char);                             
+
 /*
  * Fetches the password hash for the username "login".
  * The returned hash is stored in "pw", which is of size "pwsize".
@@ -190,8 +193,8 @@ sockd_getpassword(const char *login, char *pw, const size_t pwsize, char *emsg,
         snprintf(parm, sizeof(parm),
             "{ %s, %s, %s%s%s, %s%s%s, %s%u%s, %s%s%s }",
             "\"method\": \"SKDPW\"", "\"srvname\": \"SOCKD\""
-            "\"usercnm\": \"",   j_user,      "\"",
-            "\"usercpw\": \"",   j_peerpwd,   "\"",
+            "\"usercnm\": \"",   j_login,      "\"",
+            "\"usercpw\": \"",   j_uspwd,   "\"",
             "\"srvpid\": \"",    pid,         "\"",
             "\"asessid\": \"",   asessid,     "\"");
         argv[0] = path; argv[1] = parm; argv[2] = NULL;
@@ -247,4 +250,5 @@ static int str_tm_sncp(char *dst, size_t dstlen, char * src, char sc) {
     char tm = 'A', *dp = dst, *tdp = dst + dstlen, *sp = src;
     while (*sp && dp < tdp) *dp++ = (*sp == sc && tm)?(tm = '\0', '\\'):(tm = *sp++);
     if (dp == tdp) dp--; *dp = '\0'; return (int)(dp-dst); }
+
 
