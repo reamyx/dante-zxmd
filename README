@@ -11,18 +11,11 @@
     
         ./skdpwdck.sh (基于服务程序当前工作目录)
     
-    外部账号查询程序调用参数"$1"为单个JSON对象表达字串,示例如下:
-    { "method": "SKDPW", "usercnm": "abc000", "usercpw": "xxx",
-      "srvpid": "2233", "srvname": "SOCKD",
-      "asessid": "3C1C418D34AE480AB703355E0C5C8C50" }
-    
-    参数内容(JSON对象属性)解释:
-        method    认证方法,固定为"SKDPW"
-        usercnm   对端认证名称
-        usercpw   对端提交的密码明文
-        srvpid    sockd服务主进程PID
-        asessid   标识一次认证的UUID字串
-        srvname   服务名称,固定为"SOCKD"
+    外部账号查询程序调用参数如下:
+
+        "$1" 认证用户名称
+        "$2" 用户提交的密码
+        "$3" 服务程序主进程PID
     
     外部账号查询程序通过标准输出提供密码数据信息,首行输出密码明文,次
     行输出错误描述信息,程序正常终止以指示用户账号有效且已成功提供密码

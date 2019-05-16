@@ -33,7 +33,7 @@
  *  Software Distribution Coordinator  or  sdc@inet.no
  *  Inferno Nettverk A/S
  *  Oslo Research Park
- *  Gaustadalléen 21
+ *  Gaustadallï¿½en 21
  *  NO-0349 Oslo
  *  Norway
  *
@@ -245,7 +245,7 @@
  * The server tries to be a little more intelligent about this, but not much.
  */
 #define SOCKD_FREESLOTS_NEGOTIATE     32
-#define SOCKD_FREESLOTS_REQUEST       1
+#define SOCKD_FREESLOTS_REQUEST       12
 #define SOCKD_FREESLOTS_IO            32
 
 #if SOCKD_FREESLOTS_NEGOTIATE < 1

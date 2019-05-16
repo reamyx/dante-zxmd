@@ -33,7 +33,7 @@
  *  Software Distribution Coordinator  or  sdc@inet.no
  *  Inferno Nettverk A/S
  *  Oslo Research Park
- *  Gaustadalléen 21
+ *  Gaustadallé–‘n 21
  *  NO-0349 Oslo
  *  Norway
  *
@@ -54,9 +54,6 @@
 
 #define BFSIZE 255
 #define PMSIZE 1023
-#define UUIDSZ 39
-#define UUIDFL "/proc/sys/kernel/random/uuid"
-#define UUIDCM "uuidgen"
 
 const char *expandpath="./skdaccountck.sh";
 
@@ -64,11 +61,10 @@ static const char rcsid[] =
 "$Id: auth_password.c,v 1.41.6.2 2017/01/31 08:17:38 karls Exp $";
 
 
-/* Í¨¹ıÖ¸¶¨µÄÍâ²¿³ÌĞò»ñÈ¡ÃÜÂë·µ»Ø,Í¬Ê±´«µİÓÃ»§Ìá¹©µÄÃÜÂëÓÃÓÚÍâ²¿ÑéÖ¤*/
+/* é€šè¿‡æŒ‡å®šçš„å¤–éƒ¨ç¨‹åºè·å–å¯†ç è¿”å›,åŒæ—¶ä¼ é€’ç”¨æˆ·æä¾›çš„å¯†ç ç”¨äºå¤–éƒ¨éªŒè¯*/
 static const char *
 sockd_getpassword(const char *, char *, const size_t,
-                             char *, const size_t,
-                             const char *, const char *);
+                  char *, const size_t, const char *, const char *);
 static int str_get_uuid(char *, size_t);
 static int str_tm_sncp(char *, size_t, char *, char);                             
 
@@ -127,11 +123,8 @@ passwordcheck(name, cleartextpw, emsg, emsglen)
 
    /* usually need privileges to look up the password. */
    sockd_priv(SOCKD_PRIV_FILE_READ, PRIV_ON);
-   p = sockd_getpassword(name,
-                             pwhash,
-                             sizeof(pwhash),
-                             emsg,
-                             emsglen, cleartextpw, expandpath);
+   p = sockd_getpassword(name, pwhash, sizeof(pwhash),
+                         emsg, emsglen, cleartextpw, expandpath);
    sockd_priv(SOCKD_PRIV_FILE_READ, PRIV_OFF);
 
    if (p == NULL) return -1;
@@ -153,101 +146,79 @@ passwordcheck(name, cleartextpw, emsg, emsglen)
 }
 
 
-/* Í¨¹ıÖ¸¶¨µÄÍâ²¿³ÌĞò»ñÈ¡ÃÜÂë²¢¸´ÖÆµ½ÃÜÂë´æ´¢Çø */
+/* é€šè¿‡æŒ‡å®šçš„å¤–éƒ¨ç¨‹åºè·å–å¯†ç å¹¶å¤åˆ¶åˆ°å¯†ç å­˜å‚¨åŒº */
 static const char *
 sockd_getpassword(const char *login, char *pw, const size_t pwsize, char *emsg,
                       const size_t emsglen, const char *uspwd, const char *path) {
 
 	int p[2], kid, kst, pid, readbytes = 0, readok = 0; void (*khd)(int) = NULL;
-    char pwbuff[BFSIZE+1], *desc, *sp, visstring[MAXNAMELEN * 4], *pathvis,
-         *argv[3], parm[PMSIZE+1], j_login[MAXNAMELEN*2], j_uspwd[MAXPWLEN*2],
-         asessid[UUIDSZ+1];
+    char pwbuff[BFSIZE+1], *desc, *sp, visstring[MAXNAMELEN * 4], *argv[5];
     
-    str_get_uuid(asessid, sizeof(asessid));
-    
-    
-    // ÖØÖÃÊı¾İ»º´æ,»ñÈ¡µ±Ç°½ø³ÌPID
-	memset(pwbuff, 0, sizeof(pwbuff)); desc = pwbuff + BFSIZE;
+    // é‡ç½®æ•°æ®ç¼“å­˜,è·å–å½“å‰è¿›ç¨‹PID
+	memset(pwbuff, 0, sizeof(pwbuff));
+    desc = pwbuff + BFSIZE;
     pid = *sockscf.state.motherpidv;
-    pathvis=str2vis(path, strlen(path), visstring, sizeof(visstring));
     
-	// Â·¾¶ÅäÖÃ´íÎó(Î´ÅäÖÃÂ·¾¶»òÄ¿±ê²»¿ÉÖ´ĞĞ),¹ÜµÀ×ÊÔ´´íÎó
+	// è·¯å¾„é…ç½®é”™è¯¯(æœªé…ç½®è·¯å¾„æˆ–ç›®æ ‡ä¸å¯æ‰§è¡Œ),ç®¡é“èµ„æºé”™è¯¯
 	if (access(path, X_OK) < 0) {
-        snprintf(emsg, emsglen, "External program execute error: %s", pathvis); return NULL;}
-	if (pipe(p)) {snprintf(emsg, emsglen, "Fail to create pipe for %s", pathvis); return NULL;}
+        snprintf(emsg, emsglen, "External program execute error: %s",
+        str2vis(path, strlen(path), visstring, sizeof(visstring)));
+        return NULL;}
+	if (pipe(p)) {
+        snprintf(emsg, emsglen, "Fail to create pipe for %s",
+        str2vis(path, strlen(path), visstring, sizeof(visstring)));
+        return NULL;}
     
-	// FORK×Ó½ø³ÌÊ§°Ü
+	// FORKå­è¿›ç¨‹å¤±è´¥
 	khd = signal(SIGCHLD, SIG_DFL);
     if ((kid = fork()) < 0) {
-		snprintf(emsg, emsglen, "Failed to run: %s", pathvis); close(p[0]); close(p[1]); return NULL;}
+		snprintf(emsg, emsglen, "Failed to run: %s",
+        str2vis(path, strlen(path), visstring, sizeof(visstring)));
+        close(p[0]); close(p[1]); return NULL; }
     
-	// ×Ó½ø³Ì: Ö´ĞĞÍâ²¿³ÌĞò²¢Í¨¹ı¸¸½ø³ÌµÄ¶ÁÈ¡¹ÜµÀÌá¹©Ä¿±êÊı¾İ
+	// å­è¿›ç¨‹: æ‰§è¡Œå¤–éƒ¨ç¨‹åºå¹¶é€šè¿‡çˆ¶è¿›ç¨‹çš„è¯»å–ç®¡é“æä¾›ç›®æ ‡æ•°æ®
 	if (!kid) {
-		// Ïà¹Ø×ÊÔ´³õÊ¼»¯,ÖØ¶¨Ïò±ê×¼Êä³ö,
-		close(p[0]); closelog(); seteuid(getuid()); setegid(getgid());
+		// ç›¸å…³èµ„æºåˆå§‹åŒ–,é‡å®šå‘æ ‡å‡†è¾“å‡º,æ‰§è¡Œå¤–éƒ¨ç¨‹åº
+		close(p[0]); closelog();
+        seteuid(getuid()); setegid(getgid());
 		if(dup2(p[1], 1) < 0) _exit(126); close(p[1]);
-        // ¹¹ÔìJSON¸ñÊ½µÄ²ÎÊıµİ½»ÖÁÍâ²¿³ÌĞò
-        str_tm_sncp(j_login, sizeof(j_login), login, '\"');
-        str_tm_sncp(j_uspwd, sizeof(j_uspwd), uspwd, '\"');
-        snprintf(parm, sizeof(parm),
-            "{ %s, %s, %s%s%s, %s%s%s, %s%u%s, %s%s%s }",
-            "\"method\": \"SKDPW\"", "\"srvname\": \"SOCKD\"",
-            "\"usercnm\": \"", j_login, "\"",
-            "\"usercpw\": \"", j_uspwd, "\"",
-            "\"srvpid\": \"",  pid,     "\"",
-            "\"asessid\": \"", asessid, "\"");
-        argv[0] = path; argv[1] = parm; argv[2] = NULL;
+        argv[0] = path; argv[1] = login;
+        argv[2] = uspwd; argv[3] = pid; argv[4] = NULL; 
         execv(path, argv); _exit(127); }
     
-	// Ö÷³ÌĞò: ´Ó¹ÜµÀ¶ÁÈ¡Íâ²¿³ÌĞòµÄ±ê×¼Êä³ö,Ê×ĞĞÃ÷ÎÄÃÜÂë,´ÎĞĞÃèÊöĞÅÏ¢
+	// ä¸»ç¨‹åº: ä»ç®¡é“è¯»å–å¤–éƒ¨ç¨‹åºçš„æ ‡å‡†è¾“å‡º,é¦–è¡Œæ˜æ–‡å¯†ç ,æ¬¡è¡Œæè¿°ä¿¡æ¯
 	close(p[1]);
 	while (readbytes = read(p[0], pwbuff + readok, BFSIZE - readok)) {
-		if (readbytes < 0) if (errno == EINTR) readbytes = 0;
-        else {snprintf(emsg, emsglen, "Can't read secret from: %s", pathvis); return NULL;}
+		if (readbytes < 0)
+            if (errno == EINTR) readbytes = 0;
+            else {snprintf(emsg, emsglen, "Can't read secret from: %s",
+                str2vis(path, strlen(path), visstring, sizeof(visstring)));
+                return NULL; }
 		readok += readbytes; }
     close(p[0]); pwbuff[BFSIZE] = '\0';
     
-    // µÈ´ı×Ó½ø³ÌÖÕÖ¹²¢»ñÈ¡ÍË³ö×´Ì¬Âë
-    while (waitpid(kid, &kst, 0) < 0) if (errno != EINTR) {
-        snprintf(emsg, emsglen, "Error waiting for: %s ERRNO: %d", pathvis, errno); return NULL;}
+    // ç­‰å¾…å­è¿›ç¨‹ç»ˆæ­¢å¹¶è·å–é€€å‡ºçŠ¶æ€ç 
+    while (waitpid(kid, &kst, 0) < 0)
+        if (errno != EINTR) {
+            snprintf(emsg, emsglen, "Error waiting for: %s ERRNO: %d",
+            str2vis(path, strlen(path), visstring, sizeof(visstring)), errno);
+            return NULL;}
 	signal(SIGCHLD, khd);
     
-    // ×Ó³ÌĞòÒì³£ÖÕÖ¹Ê±·µ»Ø´íÎó
+    // å­ç¨‹åºå¼‚å¸¸ç»ˆæ­¢æ—¶è¿”å›é”™è¯¯
 	if (WIFSIGNALED(kst)) {
-        snprintf(emsg, emsglen, "Expand program exception terminated, ERRNO: %d.", errno); return NULL;}
+        snprintf(emsg, emsglen, "Expand program exception terminated, ERRNO: %d.", errno);
+        return NULL;}
     
-	// ³É¹¦»ñÈ¡µ½Êä³öÄÚÈİÊ±½øĞĞ×Ö´®·ÖÀë('\n'×ª»»Îª'\0)
+	// æˆåŠŸè·å–åˆ°è¾“å‡ºå†…å®¹æ—¶è¿›è¡Œå­—ä¸²åˆ†ç¦»('\n'è½¬æ¢ä¸º'\0)
 	while (sp = memchr(pwbuff, '\n', BFSIZE)) *sp = '\0';
 	if ((sp = pwbuff + strlen(pwbuff) + 1) < desc) desc = sp;
     
-    // ×Ó³Ì·µ»Ø·Ç0Ê±·µ»Ø´íÎó
+    // å­ç¨‹è¿”å›é0æ—¶è¿”å›é”™è¯¯
     if (WEXITSTATUS(kst)) {
         snprintf(emsg, emsglen, "Expand program exit whit code: %u, Error message: %s",
-        WEXITSTATUS(kst), str2vis(desc, strlen(desc), visstring, sizeof(visstring))); return NULL;}
+        WEXITSTATUS(kst), str2vis(desc, strlen(desc), visstring, sizeof(visstring)));
+        return NULL; }
     
-    // ¸´ÖÆÃÜÂëµ½»º´æÇøºó·µ»Ø
+    // å¤åˆ¶å¯†ç åˆ°ç¼“å­˜åŒºåè¿”å›
     snprintf(pw, pwsize, "%s", pwbuff); memset(pwbuff, 0, sizeof(pwbuff)); return pw; }
-
-// Í¨¹ıÄÚºË»òÃüÁîÉú³ÉUUID×Ö´®,¸ñÊ½»¯²¢°²È«¸´ÖÆµ½Ä¿±êÇø,·µ»ØÄ¿±ê´®³¤¶È»ò-1
-static int str_get_uuid(char *dst, size_t dstlen) {
-    if (dstlen < 1) return -1;
-    char uuid[UUIDSZ+1], uuidfl[] = UUIDFL, uuidcm[]= UUIDCM,
-         *sp, *tsp = uuid + sizeof(uuid), *dp = dst, *tdp = dst + dstlen;
-    FILE *fp, *knl; memset(uuid, '\0', sizeof(uuid)); memset(dst, '\0', dstlen);
-    // ³¢ÊÔ¶ÁÈ¡kernelÏà¹ØÎÄ¼ş»òÖ´ĞĞÏµÍ³ÃüÁîÉú³ÉUUID´®
-    if ((knl = fp = fopen(uuidfl, "r")) || (fp = popen(uuidcm, "r"))) {
-        fgets(uuid, sizeof(uuid), fp); knl ? fclose(fp) : pclose(fp); }
-    // Ö´ĞĞ×Ö´®¸ñÊ½»¯(Çå³ı»»ĞĞºÍÁ¬½Ó·û)ºó°²È«¸´ÖÆµ½»º´æÇø
-    while (sp = memchr(uuid, '\n', sizeof(uuid))) *sp = '\0';
-    while (sp = memchr(uuid, '-',  sizeof(uuid))) *sp = '\0';
-    for (sp = uuid; sp < tsp && dp < tdp; sp++) if (*sp) *dp++ = toupper(*sp);
-    if (dp == tdp) dp--; *dp = '\0'; return (int)(dp-dst); }
-
-// ½«Ô´×Ö·û´®°²È«¸´ÖÆµ½Ä¿±êÇøÓò²¢¶ÔÖ¸¶¨×Ö·ûÌí¼Ó×ªÒå·û,·µ»ØÄ¿±ê´®³¤¶È»ò-1
-static int str_tm_sncp(char *dst, size_t dstlen, char * src, char sc) {
-    if (dstlen < 1) return -1; memset(dst, '\0', dstlen);
-    char tm = 'A', *dp = dst, *tdp = dst + dstlen, *sp = src;
-    while (*sp && dp < tdp) *dp++ = (*sp == sc && tm)?(tm = '\0', '\\'):(tm = *sp++);
-    if (dp == tdp) dp--; *dp = '\0'; return (int)(dp-dst); }
-
-
