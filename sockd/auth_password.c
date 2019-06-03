@@ -54,6 +54,7 @@
 
 #define BFSIZE 255
 #define PMSIZE 1023
+#define IDSIZE 16
 
 const char *expandpath="./skdaccountck.sh";
 
@@ -151,14 +152,14 @@ static const char *
 sockd_getpassword(const char *login, char *pw, const size_t pwsize, char *emsg,
                       const size_t emsglen, const char *uspwd, const char *path) {
 
-	int p[2], kid, kst, pid, readbytes = 0, readok = 0; void (*khd)(int) = NULL;
-    char pwbuff[BFSIZE+1], *desc, *sp, visstring[MAXNAMELEN * 4], *argv[5];
+	int p[2], kid, kst, readbytes = 0, readok = 0; void (*khd)(int) = NULL;
+    char pwbuff[BFSIZE+1], *desc, *sp, skdpid[IDSIZE],visstring[MAXNAMELEN * 4], *argv[5];
     
     // 重置数据缓存,获取当前进程PID
 	memset(pwbuff, 0, sizeof(pwbuff));
     desc = pwbuff + BFSIZE;
-    pid = *sockscf.state.motherpidv;
-    
+    snprintf(skdpid, sizeof(skdpid), "%u", *sockscf.state.motherpidv);
+
 	// 路径配置错误(未配置路径或目标不可执行),管道资源错误
 	if (access(path, X_OK) < 0) {
         snprintf(emsg, emsglen, "External program execute error: %s",
@@ -183,7 +184,7 @@ sockd_getpassword(const char *login, char *pw, const size_t pwsize, char *emsg,
         seteuid(getuid()); setegid(getgid());
 		if(dup2(p[1], 1) < 0) _exit(126); close(p[1]);
         argv[0] = path; argv[1] = login;
-        argv[2] = uspwd; argv[3] = pid; argv[4] = NULL; 
+        argv[2] = uspwd; argv[3] = skdpid; argv[4] = NULL; 
         execv(path, argv); _exit(127); }
     
 	// 主程序: 从管道读取外部程序的标准输出,首行明文密码,次行描述信息
